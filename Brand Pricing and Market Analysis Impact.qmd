@@ -1,0 +1,300 @@
+---
+title: "MSIN0094 Third Assignment"
+subtitle: "Due Dec 15, 2023"
+colorlinks: true
+code-line-numbers: true
+format:
+  pdf: 
+    number-sections: true
+    toc: false
+    number-depth: 2
+    fontsize: 9pt
+    linestretch: 1.25
+  docx: 
+    number-sections: true
+    toc: false
+    number-depth: 2
+    fontsize: 9pt
+    linestretch: 1.25
+knitr:
+  opts_chunk:
+    echo: true
+    eval: true
+    warning: true
+    message: true
+    error: true
+execute: 
+  cache: false
+  freeze: false
+editor_options: 
+  chunk_output_type: inline
+---
+
+MSIN0094 Marketing Analytics - Business Case Study (Third Assignment)
+Candidate Number: JQLV2
+Word Count: 1967 
+
+# Background
+
+```{r}
+#| echo: false
+# load the dataset by running this code block.
+pacman::p_load(dplyr,modelsummary,fixest)
+data_product <- read.csv("https://www.dropbox.com/s/zdn14voui3o0zgb/data_product.csv?dl=1")
+
+data_marketing <- read.csv("https://www.dropbox.com/s/tz8t1711ll9t10g/data_marketing.csv?dl=1")
+
+data_sales <- read.csv("https://www.dropbox.com/s/synk0dokenr3m2a/data_sales.csv?dl=1")
+
+```
+
+# Data Wrangling (14 pts)
+
+Q1. Use the `dplyr` to complete the following data join operations. Please specify the '`by ='` argument within the join functions to show the IDs for your joining operations (**4pts**)
+
+```{r}
+# Merge data_product and data_sales using right_join()
+data_full <- data_product %>%
+  right_join(data_sales, by = c('product_id' = 'product_id') )
+
+# Merge data_marketing onto data_full using left_join() below
+data_full <-  data_marketing %>%
+  left_join(data_full, by = c('week_id' = 'week_id') )
+
+  
+```
+
+Q2. Based on `data_product`, use `dplyr` data functions to compute the average *RRP* for 4K LCD TVs for each brand, and rank brands from the highest average price to the lowest average price. Which brand has the most expensive 4K LCD TVs? (**4pts**).
+
+Based on data_product, the average RRP for 4k LCD TVs for each brand from highest to lowest price is £2387.59 for Samsung, £2330.742 for Sony, £2203.929 for LG, and £328.302 for Philips. The brand with the most expensive 4k LCD TV on average is Samsung. 
+
+```{r}
+
+# remember to print out the dataset
+# or TA couldn't mark
+
+#Samsung has the most expensive 4k LCD televisions, which have an average price of £2387.59.
+data_product %>%
+  group_by(technology = c('LCD'), resolution = c('4k'), brand) %>%
+  summarise(avg_price = mean(RRP, na.rm = T))%>%
+  ungroup() %>%
+  head(4) %>%
+  arrange(-avg_price)
+  
+  
+```
+
+Q3. From `data_full`, Use `dplyr` functions to compute the average weekly sales for each brand throughout the data period, and rank the brands from the highest average sales to the lowest average sales. From the result, which brand has the highest sales? (**2pts**) Does this mean this brand has the highest brand premium? (**4pts**)
+
+The brand’s average weekly sales over this time period from highest to lowest were Samsung with 14.71, LG with 8.49, Sony with 7.62, and Philips with 1.55. Given that Samsung has the largest weekly sales, it can be assumed that they have the highest brand premium, given the data is observing TV sales with similar characteristics and across different price ranges. 
+
+```{r}
+
+# remember to print out the dataset
+# or TA couldn't mark
+
+#The below code calculates the average weekly sales of each brand. The brand with the highest average weekly sales is Samsung.
+data_full%>%
+  group_by(brand.y) %>%
+  summarise(avg_sales = mean(sales, na.rm = T)) %>%
+  ungroup() %>%
+  arrange(-avg_sales)
+
+  
+```
+
+# Simple Linear Regression and Endogeneity (46 pts)
+
+Q4. Run a Marketing Mix Modeling regression (**Equation 1 hereinafter**) as follows, where the `final_price` is the actual transaction price (i.e., RRP after discounts), interpret the coefficient of `final_price` (**4pts**).
+
+After conducting a marketing mix modelling regression to assess final prices affect on sales, it can be interpreted that for every £1 increase in final price, sales increase by 0.003. The variable is also statistically significant with a p-level below 0.01, meaning its affect is achieved with 99.99% certainty.
+
+```{r}
+# write you code below to generate final_price
+
+data_full <- data_full %>%
+  mutate(final_price = RRP * (1 - discount))
+
+# write you codes for the regression equation 1 below
+ols_1 <- feols(
+  data = data_full,
+  fml = sales ~ final_price + marketing_expense
+)
+  
+```
+
+```{r}
+# do not modify the code below
+pacman::p_load(modelsummary)
+modelsummary(ols_1,
+             stars = T,
+             gof_map = c('nobs','r.squared'))
+```
+
+Q5. Discuss the endogeneity issues with `final_price` in Equation 1? (**12pts**)
+
+Endogeneity is a result of omitted variable bias and reverse causality (Miao, 2023). There are multiple methods that can be used to determine if these two conditions are violated. Primarily, the relationship between the exploratory variables and error term can be explored. If any of the exploratory variables are correlated to the error term, then endogeneity is present and the Expectation [error term | X] = 0 assumption is violated (Miao, 2023). To determine if the regression model has omitted variable bias, all relevant dependent variables should be incorporated. Further, if the dependent variable affects any of the exploratory variables, then reverse causality is occurring. If either of these conditions are present in the model, then it is experiencing endogeneity. 
+
+Equation 1 is experiencing endogeneity as it fails to meet the omitted variable bias and reverse causality assumptions. The equation experiences omitted variable bias as the sales dependent variable could be impacted by variables that are not incorporated in the model including seasonality (i.e., holiday and annual sale purchasing behaviours) and product placement through the search engine, which could be viewed as a separate variable from the marketing expenditure. Further, beyond incorporating the brand variable, product’s features, warranties, and customer service could have an effect on sales, but these variables are currently omitted. 
+
+When considering reverse causality, it can be assumed that the exploratory variable final price affects sales, while sales also affect price. The effect of price on sales can intuitively be described as a consumer selecting a product in their price range and purchasing the product. Whereas reverse causality is demonstrated as a product that might have a high sales volume and demand, which may result in a price increase. This proves that the dependent variable affects the final price exploratory variable, meaning endogeneity is present. 
+
+
+Q6. If price discounts are randomized by Amazon, can we get causal effects of price on sales from Equation 1? (**4pts**)
+
+If price discounts are randomized by Amazon through A/B testing, it would be possible to determine the causal effect of price on sales. As the discounts are randomly distributed, confounding factors are eliminated from the regression and therefore price does not have any correlation with the other variables in the model. This approach of RCT or A/B testing the “gold standard,” since selection bias and correlation are removed from the model in order to derive the true causal effect (Miao, 2023). 
+
+Q7. The following is how we typically measure brand premium using marketing mix modeling: We can further add brand factor variables to Equation 1, so that the coefficients of the brand factors represent the brand premium of each brand relative to the baseline brand after controlling for price and marketing expense. (**6pts**)
+
+-   Factorize brand into a factor variable using Philips as the baseline group and run the above regression with brand dummies. Interpret the coefficients of brand dummies (4pts)
+
+After releveling Equation 1 to assess the brand premiums using Philips as the baseline, it can be concluded that Philips is the highest performing brand. The results show that each brand has a negative coefficient when Philips is the baseline, which indicates that the remaining brands comparatively perform below Philips. From these results, it can be determined that the brand with the second highest brand premium is Sony, which has a coefficient of −1.023. This coefficient can be explained as Sony’s brand premium performing less than Philips by 1.023. 
+
+```{r}
+# factorize brand below
+pacman::p_load(modelsummary,fixest,dplyr)
+
+data_full <- data_full %>%
+  mutate(brand_factor = factor(brand.x))
+
+data_full <- data_full %>%
+  mutate(brand_relevel = relevel(brand_factor,
+                               ref = "Philips"))
+
+levels(data_full$brand_relevel)
+
+
+# run the regression below
+ols_brandeffect <- feols(data = data_full,
+                         fml = sales ~ final_price + marketing_expense + brand_relevel)
+
+# report the results
+modelsummary(ols_brandeffect,
+             stars = TRUE,
+             gof_map = c('nobs','r.squared'))
+```
+
+-   From your results, which brand seems to have the highest brand equity perceived by customers? (2pts)
+From these results, it can be concluded that Philips has the highest brand equity, as all of the variable's coefficients are negative when compared to Philips as a baseline.
+
+Q8. Can the above brand dummy coefficients give us the causal effects of brands on sales? Explain your reasoning in detail (**4pts**)
+
+A regression model’s confounding variables, which possess indirect effects on other exploratory variables, must be controlled for to observe the true causal effect. If the indirect effects are not controlled for by including them in the regression, then the total effect including the causal and indirect effects is calculated (Miao, 2023). This means the independent causal effect is not observed. Although this is the approach used to observe causal effects, this equation incorporates dummy variables, which take a value of 0 or 1 depending on the selected variable. Since the brands are dummy variables, there are not any confounding variables that would alter the brand that has been selected. For example, if the dummy variable is 1 for Philips, there are not any other variables that could be incorporated into the model to alter this selection and in turn effect sales. Whereas if brand referred to brand image and was not a dummy variable, a media attention variable could be incorporated into the regression model, which would have indirect effects on both the brand’s image and sales. 
+
+Q9. Use one of the causal inference tools we have learned in class, discuss how you would obtain the causal effect of brands on sales in general (**8pts;** open question as there could be different methods)
+
+-   Which causal inference method to use and its rationale (4pts)
+
+-   What new data to collect and how to analyze the new data (4pts)
+
+To determine the causal effect of brands on sales, A/B testing will be used. The control group will be customers regularly purchasing televisions, while the treatment group will be customers selecting televisions based on functionality without brand titles visible. By using random assignments, the confounding variables will be controlled for and the true causal effect of brand on sales can be determined. The causal effect will be measured by collecting data on the number of televisions sold by brand and group, where the difference between the volume sold to the treatment and control group will be the true effect. The null hypothesis will test whether the sales between the groups is the same, while the alternative hypothesis will determine if the group’s sales vary as a result of the implemented treatment. 
+
+Q10. From the below regression results designed by another data scientist, interpret the coefficient(s) for screen size factor variables (**4pts**). Discuss whether customers have a monotonic preference for larger screens? (i.e., ceteris paribus, the larger the screen, the higher the sales?) (**4pts**)
+
+The regression shows that the variable screen size has been factorized and its values are now incorporated into the intercept. Therefore, the coefficients can be interpreted relative to the screen size variable with a size of 30 to 39 inches, which is the segment not present in the output. In comparison to 30-to-39-inch televisions, 40-49 inch television sales are 0.094 less, 50-59 inch televisions are 2.574 greater, 60 inch and above televisions are 0.978 less, and up to 29 inch televisions are 0.133 less. 
+
+The one television segment with a greater number of sales than the 30-to-39-inch segment is the 50–59-inch segment. Despite this supporting the belief that customers have a monotonic preference for larger screens, the 60 inch segment rejects this belief as its sales are 0.978 less than the 30-39 inch segment. 
+
+
+# Instrumental Variable (40pts)
+
+Q11. One way to obtain causal effects of price on sales from secondary data is to use the instrumental variable method (**14pts**).
+
+a.  Discuss what are the requirements for instrumental variables? (6pts)
+b.  Discuss the intuition of why instrumental variables can solve endogeneity issues? (4pts)
+c.  Can we use `marketing_expense` in the dataset as an instrument variable for `final_price`? (4pts)
+
+Part A – Instrumental variables must meet the endogeneity and relevance requirements. The endogeneity requirement ensures individuals cannot influence the instrumental variable, whereas the relevance requirement explains that the instrumental variable should have a strong correlation to X and no correlation to the dependent variable (Miao, 2023). For example, if UCL students’ attendance effect on their marks was observed, tube strikes could be used as an instrumental variable since it is outside an individual’s control, is correlated to attendance, and does not directly impact the dependent variable on students’ marks. 
+
+Part B –  Endogeneity is caused by omitted variable bias and reverse causality. To address omitted variable bias, instrumental variables by definition cannot incorporate characteristics within an individual’s control. Therefore, selection bias and omitted variable bias are removed, meaning the endogeneity condition is overcome. Instrumental variables address reverse causality as they are correlated to explanatory variables, but not the dependent variable. Therefore, reverse causality is not possible as the instrumental variable cannot be related to the dependent variable.
+
+Part C – Marketing expense cannot be used as an instrumental variable for final price because it does not meet the endogeneity and relevance conditions. This is because marketing expenses are influenced by individual’s spending decisions and it has a relationship with the dependent variable, rather than the exploratory variable final price. 
+
+
+Q12. List two variables you you would collect as instrumental variables for `final_price`; Justify why they qualify as valid instruments. (**6pts**)
+
+-   Two correct instruments (2pts)
+-   Correct justification for using the two variables as instrumental variables (4pts)
+
+12.	Two instrumental variables for final price could be a corporate tax law and factory power outages. 
+
+As an assumption, the company’s main factory had a power outage and to meet consumer demand, the company has hired additional workers. Therefore, the natural disaster will not affect the customers or product sales. Although customer sales should not be impacted, the cost of hiring additional workers may cause a increase in the product prices. In this scenario, the relevance requirement is met as the power outages impact the explanatory variable of final prices and not the dependent variable of sales. Also, as this event could not be controlled for, it meets the endogeneity condition.
+
+The second instrumental variable is a newly introduced corporate tax policy. This policy is not industry specific, therefore lobbying was not effective, and individuals could not impact this policies’ instatement. Since this policy increases corporation’s costs, the assumption is that corporations will increase their prices. While this policy affects final prices, it does not have any relation to sales and is a burden experienced by the corporation, meaning it meets the relevance requirement. 
+
+
+Q13. Assume you have collected the instrument variable *`Z`* into `data_full`. In the code blocks given, show the two regressions you would need to run in order to estimate the causal effects of price on sales controlling for marketing expense (**6pts;** this question is just to write the code, no need to get the numeric results)
+
+-   Correct first stage codes and explanation of the code (3pts)
+
+-   Correct second stage codes and explanation of the codes (3pts)
+
+To conduct a regression that estimates the causal effect of price on sales controlling for marketing expenses, the first stage code runs a regression on the independent variable in relation to the instrumental variable, which is uncorrelated with the error term (Miao, 2023). As a result of the first regression controlling for endogeneity and removing the correlation between the exploratory variable and error term, the second regression is able to derive the causal effect. 
+
+$$
+sales =a+ b_1 * finalprice + b_2 marketingexpense +e
+$$
+
+```{r}
+#| eval: false
+# do not modify the above #| eval: false, it's to ask R not to run this code block.
+
+# show the estimation code below and describe the steps
+
+### Stage 1
+stage1 <- feols(fml = sales ~ final_price|
+                       marketing_expense,
+      data = data_full)
+
+# mutate predicted new_cases in data_driver
+data_full <- data_full %>%
+  mutate(predicted_sales = predict(stage1))
+
+### Stage 2
+stage2 <- feols(fml = sales ~ predicted_sales |
+                  marekting_expense,
+                data = data_full)
+
+modelsummary(list(IV_is_work_1ststage,IV_is_work_2ndstage),
+             stars = TRUE)
+
+```
+
+Q14. Besides instrumental variable method, briefly discuss how we can use difference-in-differences design to get the causal effects of price on sales (**8pts**).
+
+-   intuition of the method (4pts)
+-   data needed for the method (4pts)
+
+To determine the causal effect of brand on sales, a difference-in-difference test will be conducted. Since multiple brands are being observed and it increases the difficulty of incorporating randomization, the difference-in-difference can control for this condition. Difference-in-difference observes treatment and control groups that have parallel trends over time, which allows for the causal effects of a treatment group to be compared to the control group’s baseline values. Therefore, the difference-in-difference method controls for seasonality and randomization (Miao, 2023). To ensure that the treatment and control groups have similar characteristics over time, their parallel trends can be visualized using a graph and should appear to have the same distance between their trend lines as time progresses.  
+
+To predict the causal effect of price on sales, a discount could be offered to a randomized treatment group of customers. The population should include individuals of varying socioeconomic and demographic backgrounds to ensure the sample can replicate the control group’s population. After performing visual checks to ensure the treatment and control groups meet the parallel trends condition, the promotion of a 10% discount on a total transaction can shared with the treatment group. To conclude whether customers in the treatment group purchased more products as the price decreased, the difference between the control group and treatment can be calculated. If the difference between the two groups is larger or smaller than before the treatment was implemented, then it can be concluded that price impacts sales. This demonstrates the significance of the parallel trends assumption because if the trends are not consistent over time, it impacts the accuracy of the difference-in-difference results.
+
+Q15. In general, how can the data analytics team utilize the rich textual review data on Amazon to improve product design? (**6pts**)
+
+Data scientists use sentiment analysis and classify unstructured text data based on consumer’s sentiments regarding their product preferences and feedback (Miao, 2023). By decomposing the text into more granular levels including topics, documents, and words, they have the ability to cluster and organize the data by sentiment. This rich textual review data would be beneficial for Amazon to leverage and improve their product design. With the text data provided, it would be able to draw conclusions about the consumers’ greatest challenges with setting up the televisions, operating them, and their functionality over time. Whether Amazon uses the data to improve its products, update the accuracy of its listing information, or improve the customer experience, Amazon can use this data to draw insightful conclusions and better target consumers in the future.  
+
+References 
+
+Miao, W. (2023). ‘The Causal Impact of COVID-19 on Ridesharing Using Instrumental Variables.’ UCL School of Management. (Accessed: 15 December 2023)
+
+Miao, W. (2023). ‘Class 5 Data Wrangling with R (Part II).’ UCL School of Management.
+(Accessed: 15 December 2023)
+
+Miao, W. (2023). ‘Class 15 Endogeneity.’ UCL School of Management.
+(Accessed: 15 December 2023)
+
+Miao, W. (2023). ‘Class 16 Instrumental Variables.’ UCL School of Management.
+(Accessed: 15 December 2023)
+
+Miao, W. (2023). ‘Class 17 Regression Discontinuity Design.’ UCL School of Management.
+(Accessed: 15 December 2023)
+
+Miao, W. (2023). ‘Class 18 Difference-in-Differences Design.’ UCL School of Management.
+(Accessed: 15 December 2023)
+
+Miao, W. (2023). ‘Class 19 Frontiers of Marketing Analytics.’ UCL School of Management.
+(Accessed: 15 December 2023)
+
+Miao, W. (2023). ‘Class 13 OLS Regression Advanced.’ UCL School of Management.
+(Accessed: 15 December 2023)
+
